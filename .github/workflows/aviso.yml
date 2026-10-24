@@ -1,0 +1,30 @@
+name: Aviso Duna
+ 
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # cada 10 minutos (hora UTC, da igual para este caso)
+  workflow_dispatch:          # permite correrlo a mano desde la pestaña Actions
+ 
+permissions:
+  contents: read
+  actions: write              # necesario para que el workflow se desactive solo al encontrar la película
+ 
+jobs:
+  chequear:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - name: Buscar Duna en Showcase
+        id: check
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 aviso_duna_showcase.py --once
+ 
+      - name: Desactivar el workflow (ya avisó)
+        if: steps.check.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable "Aviso Duna" --repo ${{ github.repository }}
+ 
