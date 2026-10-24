@@ -25,6 +25,7 @@ import urllib.request
 URL = "https://entradas.todoshowcase.com/showcase/"
 CHECK_EVERY_SECONDS = 300          # 5 minutos; no bajar de esto para no molestar al sitio
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".duna_avisado")
+ESTADO = {"error": False}  # se pone en True si el último chequeo no pudo descargar la página
 
 # Qué consideramos "la película". Se compara sobre el texto normalizado (sin tildes, minúsculas).
 PATRONES = [
@@ -86,9 +87,11 @@ def chequear() -> bool:
     """Un chequeo. Devuelve True si ya avisó (ahora o antes)."""
     if os.path.exists(STATE_FILE):
         return True
+    ESTADO["error"] = False
     try:
         pagina = descargar(URL)
     except Exception as e:
+        ESTADO["error"] = True
         print(f"[{time.strftime('%H:%M:%S')}] Error al descargar la cartelera: {e}")
         return False
 
@@ -110,6 +113,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true", help="un solo chequeo y salir")
     ap.add_argument("--test", action="store_true", help="enviar mensaje de prueba y salir")
+    ap.add_argument("--heartbeat", action="store_true",
+                    help="con --once: si no apareció, manda un resumen de estado por Telegram")
     args = ap.parse_args()
 
     if args.test:
@@ -118,7 +123,15 @@ def main():
         return
 
     if args.once:
-        if chequear():
+        encontrada = chequear()
+        if not encontrada and args.heartbeat:
+            if ESTADO["error"]:
+                telegram("⚠️ Resumen semanal: no pude leer la cartelera de Showcase en este "
+                         "chequeo. Revisá la pestaña Actions del repo por si hay un problema.")
+            else:
+                telegram("👀 Resumen semanal: sigo chequeando Showcase, "
+                         "Duna: Parte Tres todavía no aparece.")
+        if encontrada:
             # Si corre en GitHub Actions, avisa al workflow que ya encontró la película
             salida = os.environ.get("GITHUB_OUTPUT")
             if salida:
