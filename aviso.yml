@@ -2,12 +2,17 @@ name: Aviso Duna
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # cada 10 minutos (hora UTC, da igual para este caso)
+    - cron: "*/10 * * * *"   # chequeo cada 10 minutos
+    - cron: "0 12 * * 1"     # lunes 12:00 UTC (9:00 en Argentina): chequeo + resumen semanal
   workflow_dispatch:          # permite correrlo a mano desde la pestaña Actions
 
 permissions:
   contents: read
   actions: write              # necesario para que el workflow se desactive solo al encontrar la película
+
+concurrency:
+  group: aviso-duna
+  cancel-in-progress: false
 
 jobs:
   chequear:
@@ -20,7 +25,7 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python3 aviso_duna_showcase.py --once
+        run: python3 aviso_duna_showcase.py --once ${{ github.event.schedule == '0 12 * * 1' && '--heartbeat' || '' }}
 
       - name: Desactivar el workflow (ya avisó)
         if: steps.check.outputs.found == 'true'
